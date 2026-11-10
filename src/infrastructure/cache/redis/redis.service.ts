@@ -1,15 +1,11 @@
-import { Injectable } from '@nestjs/common';
-import { InjectRedis } from '@nestjs-redis/client';
-import type { RedisClientType } from 'redis';
+import { Inject, Injectable } from '@nestjs/common';
+import { CACHE_MANAGER, type Cache } from '@nestjs/cache-manager';
 
 @Injectable()
 export class RedisService {
-  constructor(@InjectRedis() private readonly client: RedisClientType) {}
+  constructor(@Inject(CACHE_MANAGER) private readonly cacheManager: Cache) {}
 
-  getClient(): RedisClientType {
-    if (!this.client.isReady) {
-      throw new Error('Redis client is not ready');
-    }
-    return this.client;
+  getCacheManager(): Cache {
+    return this.cacheManager;
   }
 }
