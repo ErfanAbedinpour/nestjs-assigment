@@ -2,7 +2,7 @@ import { Logger, Module } from '@nestjs/common';
 import { CacheModule } from '@nestjs/cache-manager';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { createKeyv } from '@keyv/redis';
-import { RedisService } from './redis.service.js';
+import { RedisService } from './redis.service';
 
 const logger = new Logger('RedisModule');
 
