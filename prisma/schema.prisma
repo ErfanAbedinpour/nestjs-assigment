@@ -6,3 +6,109 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
+
+enum PaymentStatus {
+  PENDING
+  QUEUED
+  PROCESSING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+}
+
+enum TransactionType {
+  CREDIT
+  DEBIT
+}
+
+enum PaymentEventType {
+  CREATED
+  QUEUED
+  PROCESSING_STARTED
+  SUCCEEDED
+  FAILED
+  RETRY_TRIGGERED
+  CANCELLED
+}
+
+model User {
+  id        String   @id @db.Uuid
+  email     String   @unique
+  name      String
+  balance   BigInt   @default(0)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  payments     Payment[]
+  transactions LedgerEntry[]
+
+  @@map("users")
+}
+
+model Payment {
+  id                  String        @id @db.Uuid
+  userId              String        @map("user_id") @db.Uuid
+  amount              BigInt
+  reference           String
+  description         String
+  status              PaymentStatus
+  idempotencyKey      String        @map("idempotency_key")
+  requestFingerprint  String        @map("request_fingerprint")
+  attempts            Int           @default(0)
+  failureCode         String?       @map("failure_code")
+  failureReason       String?       @map("failure_reason")
+  nextDispatchAt      DateTime      @map("next_dispatch_at") @db.Timestamptz(3)
+  queuedAt            DateTime?     @map("queued_at") @db.Timestamptz(3)
+  processingStartedAt DateTime?     @map("processing_started_at") @db.Timestamptz(3)
+  completedAt         DateTime?     @map("completed_at") @db.Timestamptz(3)
+  version             Int           @default(0)
+  createdAt           DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt           DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  user        User           @relation(fields: [userId], references: [id])
+  events      PaymentEvent[]
+  transaction LedgerEntry?
+
+  @@unique([userId, idempotencyKey])
+  @@index([status, nextDispatchAt])
+  @@index([userId, createdAt])
+  @@map("payments")
+}
+
+/// Append-only ledger. `transactions` is the table name required by the specification.
+model LedgerEntry {
+  id             String          @id @db.Uuid
+  userId         String          @map("user_id") @db.Uuid
+  type           TransactionType
+  amount         BigInt
+  balanceAfter   BigInt          @map("balance_after")
+  paymentId      String?         @unique @map("payment_id") @db.Uuid
+  reference      String?
+  description    String?
+  idempotencyKey String          @map("idempotency_key")
+  createdAt      DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  user    User     @relation(fields: [userId], references: [id])
+  payment Payment? @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+
+  @@unique([userId, idempotencyKey])
+  @@index([userId, createdAt])
+  @@index([createdAt])
+  @@map("transactions")
+}
+
+model PaymentEvent {
+  id         String           @id @db.Uuid
+  paymentId  String           @map("payment_id") @db.Uuid
+  type       PaymentEventType
+  attempt    Int
+  fromStatus PaymentStatus?   @map("from_status")
+  toStatus   PaymentStatus    @map("to_status")
+  metadata   Json?
+  occurredAt DateTime         @map("occurred_at") @db.Timestamptz(3)
+
+  payment Payment @relation(fields: [paymentId], references: [id])
+
+  @@index([paymentId, occurredAt])
+  @@map("payment_events")
+}
