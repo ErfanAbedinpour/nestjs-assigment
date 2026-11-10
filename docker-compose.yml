@@ -1,38 +1,83 @@
+x-app-build: &app-build
+  context: .
+  dockerfile: Dockerfile
+
+x-app-environment: &app-environment
+  NODE_ENV: ${NODE_ENV:-production}
+  APP_PORT: ${APP_PORT:-3000}
+  DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in your .env file}
+  POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
+  POSTGRES_PORT: ${POSTGRES_PORT:-5432}
+  POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB in your .env file}
+  POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in your .env file}
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in your .env file}
+  RABBITMQ_HOST: ${RABBITMQ_HOST:-rabbitmq}
+  RABBITMQ_PORT: ${RABBITMQ_PORT:-5672}
+  RABBITMQ_USERNAME: ${RABBITMQ_USERNAME:?Set RABBITMQ_USERNAME in your .env file}
+  RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?Set RABBITMQ_PASSWORD in your .env file}
+  RABBITMQ_VHOST: ${RABBITMQ_VHOST:-/}
+  RABBITMQ_URL: ${RABBITMQ_URL:-}
+  REDIS_HOST: ${REDIS_HOST:-redis}
+  REDIS_PORT: ${REDIS_PORT:-6379}
+  REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+  REDIS_DB: ${REDIS_DB:-0}
+  REDIS_URL: ${REDIS_URL:-}
+  ADMIN_API_KEY: ${ADMIN_API_KEY:-change_me}
+  PAYMENT_MAX_ATTEMPTS: ${PAYMENT_MAX_ATTEMPTS:-5}
+  PAYMENT_RETRY_BASE_DELAY_MS: ${PAYMENT_RETRY_BASE_DELAY_MS:-1000}
+  PAYMENT_RETRY_MAX_DELAY_MS: ${PAYMENT_RETRY_MAX_DELAY_MS:-60000}
+  PAYMENT_PROCESSING_LEASE_MS: ${PAYMENT_PROCESSING_LEASE_MS:-30000}
+  PAYMENT_QUEUED_STALE_MS: ${PAYMENT_QUEUED_STALE_MS:-30000}
+  PAYMENT_FAILURE_PER_MINOR_UNIT: ${PAYMENT_FAILURE_PER_MINOR_UNIT:-0.00001}
+  PAYMENT_FORCED_FAILURE_REFERENCES: ${PAYMENT_FORCED_FAILURE_REFERENCES:-FAIL}
+
+x-app-dependencies: &app-dependencies
+  migrate:
+    condition: service_completed_successfully
+  postgres:
+    condition: service_healthy
+  rabbitmq:
+    condition: service_healthy
+  redis:
+    condition: service_healthy
+
 services:
-  app:
+  migrate:
     build:
       context: .
       dockerfile: Dockerfile
-    restart: unless-stopped
+      target: migrate
+    restart: 'no'
     environment:
-      NODE_ENV: ${NODE_ENV:-production}
-      APP_PORT: ${APP_PORT:-3000}
       DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in your .env file}
-      POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
-      POSTGRES_PORT: ${POSTGRES_PORT:-5432}
-      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB in your .env file}
-      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in your .env file}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in your .env file}
-      RABBITMQ_HOST: ${RABBITMQ_HOST:-rabbitmq}
-      RABBITMQ_PORT: ${RABBITMQ_PORT:-5672}
-      RABBITMQ_USERNAME: ${RABBITMQ_USERNAME:?Set RABBITMQ_USERNAME in your .env file}
-      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?Set RABBITMQ_PASSWORD in your .env file}
-      RABBITMQ_VHOST: ${RABBITMQ_VHOST:-/}
-      RABBITMQ_URL: ${RABBITMQ_URL:-}
-      REDIS_HOST: ${REDIS_HOST:-redis}
-      REDIS_PORT: ${REDIS_PORT:-6379}
-      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
-      REDIS_DB: ${REDIS_DB:-0}
-      REDIS_URL: ${REDIS_URL:-}
-    ports:
-      - '127.0.0.1:${APP_HOST_PORT:-3000}:${APP_PORT:-3000}'
     depends_on:
       postgres:
         condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+    networks:
+      - app-network
+
+  app:
+    build: *app-build
+    image: tops-payment-backend
+    restart: unless-stopped
+    environment:
+      <<: *app-environment
+    ports:
+      - '127.0.0.1:${APP_HOST_PORT:-3000}:${APP_PORT:-3000}'
+    depends_on:
+      <<: *app-dependencies
+    networks:
+      - app-network
+
+  worker:
+    build: *app-build
+    image: tops-payment-backend
+    command: ['node', 'dist/worker.js']
+    restart: unless-stopped
+    environment:
+      <<: *app-environment
+    depends_on:
+      <<: *app-dependencies
     networks:
       - app-network
 
