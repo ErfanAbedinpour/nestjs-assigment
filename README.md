@@ -8,7 +8,7 @@ A production-conscious NestJS foundation with PostgreSQL, Prisma, RabbitMQ, and 
 - NestJS 12
 - PostgreSQL 18 and Prisma ORM 7 with the PostgreSQL driver adapter
 - RabbitMQ 4 with the management plugin, using `amqplib` and `amqp-connection-manager` for connection lifecycle and reconnects
-- Redis 8 using the official image, the `redis` Node client, and Nest DI through `@nestjs-redis/client`
+- Redis 8 using the official image, Nest's `@nestjs/cache-manager`, and the documented `@keyv/redis` store
 - Docker Compose
 
 ## Architecture
@@ -51,7 +51,7 @@ docker/
 test/
 ```
 
-`PrismaService` and `RabbitMqService` manage connection startup and graceful shutdown. `@nestjs-redis/client` manages Redis connection lifecycle and is exposed through the local `RedisService` adapter. Infrastructure modules export only their infrastructure provider. No business module or HTTP controller is included.
+`PrismaService` and `RabbitMqService` manage connection startup and graceful shutdown. `RedisModule` configures Nest's cache manager with the `@keyv/redis` store, attaches a Redis error listener, and exposes the cache manager through the local `RedisService` adapter. Nest's cache module handles store shutdown. This configures the Redis adapter only; no cache operations, policies, or workflows are implemented. Infrastructure modules export only their infrastructure provider. No business module or HTTP controller is included.
 
 ## Prerequisites
 
