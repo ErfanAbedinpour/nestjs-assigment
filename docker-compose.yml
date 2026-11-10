@@ -1,0 +1,118 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      APP_PORT: ${APP_PORT:-3000}
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in your .env file}
+      POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
+      POSTGRES_PORT: ${POSTGRES_PORT:-5432}
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB in your .env file}
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in your .env file}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in your .env file}
+      RABBITMQ_HOST: ${RABBITMQ_HOST:-rabbitmq}
+      RABBITMQ_PORT: ${RABBITMQ_PORT:-5672}
+      RABBITMQ_USERNAME: ${RABBITMQ_USERNAME:?Set RABBITMQ_USERNAME in your .env file}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?Set RABBITMQ_PASSWORD in your .env file}
+      RABBITMQ_VHOST: ${RABBITMQ_VHOST:-/}
+      RABBITMQ_URL: ${RABBITMQ_URL:-}
+      REDIS_HOST: ${REDIS_HOST:-redis}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      REDIS_DB: ${REDIS_DB:-0}
+      REDIS_URL: ${REDIS_URL:-}
+    ports:
+      - '127.0.0.1:${APP_HOST_PORT:-3000}:${APP_PORT:-3000}'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - app-network
+
+  postgres:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB in your .env file}
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in your .env file}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in your .env file}
+      POSTGRES_PORT: ${POSTGRES_PORT:-5432}
+    command: ['postgres', '-p', '${POSTGRES_PORT:-5432}']
+    ports:
+      - '127.0.0.1:${POSTGRES_HOST_PORT:-5432}:${POSTGRES_PORT:-5432}'
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -p "$$POSTGRES_PORT" -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - app-network
+
+  rabbitmq:
+    image: rabbitmq:4-management-alpine
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USERNAME:?Set RABBITMQ_USERNAME in your .env file}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?Set RABBITMQ_PASSWORD in your .env file}
+      RABBITMQ_DEFAULT_VHOST: ${RABBITMQ_VHOST:-/}
+      RABBITMQ_NODE_PORT: ${RABBITMQ_PORT:-5672}
+    ports:
+      - '127.0.0.1:${RABBITMQ_HOST_PORT:-5672}:${RABBITMQ_PORT:-5672}'
+      - '127.0.0.1:${RABBITMQ_MANAGEMENT_PORT:-15672}:15672'
+    healthcheck:
+      test: ['CMD', 'rabbitmq-diagnostics', '-q', 'ping']
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    networks:
+      - app-network
+
+  redis:
+    image: redis:8-alpine
+    restart: unless-stopped
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+    command:
+      - sh
+      - -c
+      - |
+        if [ -n "$$REDIS_PASSWORD" ]; then
+          exec redis-server --port "$$REDIS_PORT" --appendonly yes --requirepass "$$REDIS_PASSWORD"
+        fi
+        exec redis-server --port "$$REDIS_PORT" --appendonly yes
+    ports:
+      - '127.0.0.1:${REDIS_HOST_PORT:-6379}:${REDIS_PORT:-6379}'
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - if [ -n "$$REDIS_PASSWORD" ]; then export REDISCLI_AUTH="$$REDIS_PASSWORD"; fi; redis-cli -h 127.0.0.1 -p "$$REDIS_PORT" ping | grep -q PONG
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    networks:
+      - app-network
+
+volumes:
+  postgres-data:
+  redis-data:
+
+networks:
+  app-network:
+    driver: bridge
