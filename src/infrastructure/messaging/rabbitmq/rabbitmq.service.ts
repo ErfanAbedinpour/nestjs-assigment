@@ -1,23 +1,31 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import amqp, { type ChannelModel } from 'amqplib';
+import { connect, type AmqpConnectionManager } from 'amqp-connection-manager';
 
 @Injectable()
 export class RabbitMqService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(RabbitMqService.name);
-  private connection: ChannelModel | undefined;
+  private connection: AmqpConnectionManager | undefined;
 
   constructor(private readonly config: ConfigService) {}
 
   async onModuleInit(): Promise<void> {
     const url = this.config.getOrThrow<string>('rabbitmq.url');
-    this.connection = await amqp.connect(url);
-    this.connection.on('error', (error: Error) => {
-      this.logger.error('RabbitMQ connection error', error.stack);
+    const connection = connect([url]);
+    connection.on('connectFailed', ({ err }) => {
+      this.logger.error('RabbitMQ connection attempt failed', err.stack);
     });
+    connection.on('disconnect', ({ err }) => {
+      if (err) this.logger.error('RabbitMQ disconnected', err.stack);
+    });
+    connection.on('error', (error) => {
+      this.logger.error('RabbitMQ connection manager error', error.stack);
+    });
+    this.connection = connection;
+    await connection.connect();
   }
 
-  getConnection(): ChannelModel {
+  getConnection(): AmqpConnectionManager {
     if (!this.connection) {
       throw new Error('RabbitMQ connection is not initialized');
     }
