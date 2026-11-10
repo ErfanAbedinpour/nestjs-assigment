@@ -14,6 +14,10 @@ COPY tsconfig.json tsconfig.build.json nest-cli.json ./
 COPY src ./src
 RUN DATABASE_URL=postgresql://generate:generate@localhost:5432/generate npm run build
 
+# Reuses the build stage so migrate does not run a second npm ci beside the app build.
+FROM build AS migrate
+CMD ["npx", "prisma", "migrate", "deploy"]
+
 FROM node:24-alpine AS production
 ENV NODE_ENV=production
 WORKDIR /app
