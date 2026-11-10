@@ -1,5 +1,5 @@
 {
-  "name": "hexagonal-nestjs-foundation",
+  "name": "nestjs-assignment",
   "version": "1.0.0",
   "private": true,
   "type": "module",
@@ -29,17 +29,19 @@
     "prisma:studio": "prisma studio"
   },
   "dependencies": {
+    "@nestjs-redis/client": "^2.0.1",
     "@nestjs/common": "^12.0.0",
     "@nestjs/config": "^12.0.0",
     "@nestjs/core": "^12.0.0",
     "@nestjs/platform-express": "^12.0.0",
     "@prisma/adapter-pg": "^7.10.0",
     "@prisma/client": "^7.10.0",
+    "amqp-connection-manager": "^5.0.1",
     "amqplib": "^0.10.8",
     "joi": "^18.0.0",
     "pg": "^8.16.0",
-    "reflect-metadata": "^0.2.2",
     "redis": "^5.8.0",
+    "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2"
   },
   "devDependencies": {
@@ -50,6 +52,7 @@
     "@types/amqplib": "^0.10.7",
     "@types/node": "^24.0.0",
     "@types/pg": "^8.15.0",
+    "@vitest/coverage-v8": "^5.0.0",
     "eslint": "^9.0.0",
     "eslint-config-prettier": "^10.0.0",
     "prettier": "^3.6.0",
@@ -58,7 +61,6 @@
     "tsconfig-paths": "^4.2.0",
     "typescript": "^6.0.0",
     "typescript-eslint": "^8.0.0",
-    "vitest": "^5.0.0",
-    "@vitest/coverage-v8": "^5.0.0"
+    "vitest": "^5.0.0"
   }
 }
