@@ -1,3 +1,9 @@
+import { CommandBus, QueryBus } from '@nestjs/cqrs';
+import { CancelPaymentCommand } from '../application/command/cancel-payment.command';
+import { RetryPaymentCommand } from '../application/command/retry-payment.command';
+import { SubmitPaymentCommand } from '../application/command/submit-payment.command';
+import { GetPaymentQuery } from '../application/query/get-payment.query';
+import { GetPaymentEventsQuery } from '../application/query/get-payment-events.query';
 import {
   Body,
   Controller,
@@ -7,12 +13,8 @@ import {
   ParseUUIDPipe,
   Post,
 } from '@nestjs/common';
-import { Money } from '../../../shared/domain/money';
+import { Money } from '../../../shared/domain/value-object/money.vo';
 import { IdempotencyKey } from '../../../shared/presentation/idempotency-key.decorator';
-import { CancelPayment } from '../application/cancel-payment';
-import { GetPayment } from '../application/get-payment';
-import { RetryPayment } from '../application/retry-payment';
-import { SubmitPayment } from '../application/submit-payment';
 import type { PaymentEventView, PaymentView } from '../application/payment.view';
 import { SubmitPaymentBody, submitPaymentSchema } from './payment.schemas';
 import {
@@ -28,10 +30,8 @@ import {
 @Controller('payments')
 export class PaymentsController {
   constructor(
-    private readonly submitPayment: SubmitPayment,
-    private readonly getPayment: GetPayment,
-    private readonly retryPayment: RetryPayment,
-    private readonly cancelPayment: CancelPayment,
+    private readonly commands: CommandBus,
+    private readonly queries: QueryBus,
   ) {}
 
   @applySubmitPayment()
@@ -41,13 +41,15 @@ export class PaymentsController {
     @IdempotencyKey() idempotencyKey: string,
     @Body({ schema: submitPaymentSchema }) body: SubmitPaymentBody,
   ): Promise<PaymentView> {
-    return this.submitPayment.execute({
-      userId: body.userId,
-      amount: Money.positive(body.amount),
-      reference: body.reference,
-      description: body.description,
-      idempotencyKey,
-    });
+    return this.commands.execute(
+      new SubmitPaymentCommand({
+        userId: body.userId,
+        amount: Money.positive(body.amount),
+        reference: body.reference,
+        description: body.description,
+        idempotencyKey,
+      }),
+    );
   }
 
   @applyGetPayment()
@@ -55,7 +57,7 @@ export class PaymentsController {
   get(
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
   ): Promise<PaymentView> {
-    return this.getPayment.execute(id);
+    return this.queries.execute(new GetPaymentQuery(id));
   }
 
   @applyPaymentEvents()
@@ -63,7 +65,7 @@ export class PaymentsController {
   events(
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
   ): Promise<PaymentEventView[]> {
-    return this.getPayment.events(id);
+    return this.queries.execute(new GetPaymentEventsQuery(id));
   }
 
   @applyRetryPayment()
@@ -71,7 +73,7 @@ export class PaymentsController {
   retry(
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
   ): Promise<PaymentView> {
-    return this.retryPayment.execute(id);
+    return this.commands.execute(new RetryPaymentCommand(id));
   }
 
   @applyCancelPayment()
@@ -79,6 +81,6 @@ export class PaymentsController {
   cancel(
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
   ): Promise<PaymentView> {
-    return this.cancelPayment.execute(id);
+    return this.commands.execute(new CancelPaymentCommand(id));
   }
 }
