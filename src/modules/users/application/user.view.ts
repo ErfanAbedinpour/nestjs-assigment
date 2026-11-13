@@ -1,5 +1,5 @@
-import type { User } from '../domain/user';
-import type { LedgerTransaction } from '../domain/ledger-transaction';
+import type { User } from '../domain/aggregation/user.aggregate';
+import type { LedgerTransaction } from '../domain/entity/ledger-transaction.entity';
 
 export type UserView = {
   id: string;
