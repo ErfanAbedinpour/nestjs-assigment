@@ -1,4 +1,4 @@
-import type { Money } from '../../../../shared/domain/money';
+import type { Money } from '../../../../shared/domain/value-object/money.vo';
 
 export type AccountDebitCommand = {
   userId: string;
