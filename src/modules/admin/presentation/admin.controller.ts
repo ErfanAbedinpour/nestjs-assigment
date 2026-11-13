@@ -1,5 +1,10 @@
 import { Controller, Get, Param, ParseUUIDPipe, Query, UseGuards } from '@nestjs/common';
-import { AdminReports } from '../application/admin-reports';
+import { QueryBus } from '@nestjs/cqrs';
+import { ListAdminUsersQuery } from '../application/query/list-admin-users.query';
+import { GetAdminUserQuery } from '../application/query/get-admin-user.query';
+import { GetAdminUserTransactionsQuery } from '../application/query/get-admin-user-transactions.query';
+import { GetTransactionSummaryQuery } from '../application/query/get-transaction-summary.query';
+import { GetBalanceUsageQuery } from '../application/query/get-balance-usage.query';
 import type {
   AdminTransactionView,
   AdminUserView,
@@ -27,14 +32,14 @@ import {
 @Controller('admin')
 @UseGuards(AdminApiKeyGuard)
 export class AdminController {
-  constructor(private readonly reports: AdminReports) {}
+  constructor(private readonly queries: QueryBus) {}
 
   @applyListUsers()
   @Get('users')
   users(
     @Query({ schema: pageQuerySchema }) query: PageQuery,
   ): Promise<Page<AdminUserView>> {
-    return this.reports.listUsers(query);
+    return this.queries.execute(new ListAdminUsersQuery(query));
   }
 
   @applyAdminUser()
@@ -42,7 +47,7 @@ export class AdminController {
   user(
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
   ): Promise<AdminUserView> {
-    return this.reports.user(id);
+    return this.queries.execute(new GetAdminUserQuery(id));
   }
 
   @applyUserTransactions()
@@ -51,7 +56,7 @@ export class AdminController {
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @Query({ schema: pageQuerySchema }) query: PageQuery,
   ): Promise<Page<AdminTransactionView>> {
-    return this.reports.userTransactions(id, query);
+    return this.queries.execute(new GetAdminUserTransactionsQuery(id, query));
   }
 
   @applyTransactionSummary()
@@ -59,12 +64,14 @@ export class AdminController {
   transactionSummary(
     @Query({ schema: summaryQuerySchema }) query: SummaryQuery,
   ): Promise<TransactionSummary> {
-    return this.reports.transactionSummary(query.period, query.from, query.to);
+    return this.queries.execute(
+      new GetTransactionSummaryQuery(query.period, query.from, query.to),
+    );
   }
 
   @applyBalanceUsage()
   @Get('reports/balance-usage')
   balanceUsage(): Promise<BalanceUsage> {
-    return this.reports.balanceUsage();
+    return this.queries.execute(new GetBalanceUsageQuery());
   }
 }
