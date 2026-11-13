@@ -39,7 +39,7 @@ Amounts are integers of minor units. The domain calculates them with decimal.js 
 
 ## Payment lifecycle
 
-`POST /payments` commits a `PENDING` payment and returns `202` even when the broker is down. The row is the outbox. A dispatcher publishes it and then marks it `QUEUED` in the same transaction as the row lock. The worker claims a `QUEUED` row (`PROCESSING`, attempt + 1), runs the failure simulator outside a transaction, then settles:
+`POST /payments` commits a `PENDING` payment and returns `202` even when the broker is down. The row is the outbox. A dispatcher publishes it and then marks it `QUEUED` in the same transaction as the row lock. The worker claims a `QUEUED` row (`PROCESSING`, attempt + 1). If the balance is insufficient, it goes directly to settlement; otherwise it runs the failure simulator outside a transaction before settling. Settlement checks the balance again under a lock:
 
 - sufficient balance: one ledger `DEBIT` and `SUCCEEDED`, atomically
 - insufficient balance: `FAILED`, not retried until the balance can cover it
