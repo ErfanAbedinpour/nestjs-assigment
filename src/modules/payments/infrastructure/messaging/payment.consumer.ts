@@ -2,13 +2,14 @@ import {
   Injectable,
   Logger,
   type OnModuleDestroy,
-  type OnModuleInit,
+  type OnApplicationBootstrap,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { ConsumeMessage } from 'amqplib';
 import type { Channel, ChannelWrapper } from 'amqp-connection-manager';
 import { RabbitMqService } from '../../../../infrastructure/messaging/rabbitmq/rabbitmq.service';
-import { ProcessPayment } from '../../application/process-payment';
+import { CommandBus } from '@nestjs/cqrs';
+import { ProcessPaymentCommand } from '../../application/command/process-payment.command';
 import { PaymentQueueTopology } from './payment-queue.topology';
 
 /**
@@ -17,18 +18,18 @@ import { PaymentQueueTopology } from './payment-queue.topology';
  * payment no longer QUEUED is ignored, and the reconciler repairs a crashed attempt.
  */
 @Injectable()
-export class PaymentConsumer implements OnModuleInit, OnModuleDestroy {
+export class PaymentConsumer implements OnApplicationBootstrap, OnModuleDestroy {
   private readonly logger = new Logger(PaymentConsumer.name);
   private channel: ChannelWrapper | undefined;
 
   constructor(
     private readonly rabbit: RabbitMqService,
     private readonly topology: PaymentQueueTopology,
-    private readonly processPayment: ProcessPayment,
+    private readonly commands: CommandBus,
     private readonly config: ConfigService,
   ) {}
 
-  async onModuleInit(): Promise<void> {
+  async onApplicationBootstrap(): Promise<void> {
     const names = this.topology.names();
     const channel = this.rabbit.getConnection().createChannel({
       name: 'payment-consumer',
@@ -72,7 +73,7 @@ export class PaymentConsumer implements OnModuleInit, OnModuleDestroy {
     }
 
     try {
-      await this.processPayment.execute(paymentId);
+      await this.commands.execute(new ProcessPaymentCommand(paymentId));
       channel.ack(message);
     } catch (error) {
       this.logger.error(
