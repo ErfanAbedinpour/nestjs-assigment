@@ -5,7 +5,7 @@ import {
   HttpException,
   Logger,
 } from '@nestjs/common';
-import { DomainError } from '../domain/domain-error';
+import { DomainError } from '../domain/error/domain.error';
 
 const STATUS_BY_CODE: Record<string, number> = {
   INVALID_AMOUNT: 400,
