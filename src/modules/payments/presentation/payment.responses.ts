@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { minorUnitAmountApiProperty } from '../../../shared/presentation/amount.schema';
-import { PaymentEventType, PaymentStatus } from '../domain/payment-status';
+import { PaymentEventType, PaymentStatus } from '../domain/types/payment-status.types';
 
 export class PaymentResponseDto {
   @ApiProperty({ format: 'uuid' })
