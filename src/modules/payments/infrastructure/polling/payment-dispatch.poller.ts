@@ -2,24 +2,25 @@ import {
   Injectable,
   Logger,
   type OnModuleDestroy,
-  type OnModuleInit,
+  type OnApplicationBootstrap,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { DispatchPendingPayments } from '../../application/dispatch-pending-payments';
+import { CommandBus } from '@nestjs/cqrs';
+import { DispatchPendingPaymentsCommand } from '../../application/command/dispatch-pending-payments.command';
 
 @Injectable()
-export class PaymentDispatchPoller implements OnModuleInit, OnModuleDestroy {
+export class PaymentDispatchPoller implements OnApplicationBootstrap, OnModuleDestroy {
   private readonly logger = new Logger(PaymentDispatchPoller.name);
   private timer: ReturnType<typeof setTimeout> | undefined;
   private stopped = false;
   private running = false;
 
   constructor(
-    private readonly dispatch: DispatchPendingPayments,
+    private readonly commands: CommandBus,
     private readonly config: ConfigService,
   ) {}
 
-  onModuleInit(): void {
+  onApplicationBootstrap(): void {
     void this.tick();
   }
 
@@ -43,7 +44,7 @@ export class PaymentDispatchPoller implements OnModuleInit, OnModuleDestroy {
     }
     this.running = true;
     try {
-      await this.dispatch.execute();
+      await this.commands.execute(new DispatchPendingPaymentsCommand());
     } catch (error) {
       this.logger.error(
         'Payment dispatch poll failed',
