@@ -1,11 +1,11 @@
 import { Decimal } from 'decimal.js';
 import { RandomSource } from '../../../../shared/application/ports/random-source';
-import { FailureCode } from '../../domain/payment-status';
+import { FailureCode } from '../../domain/types/payment-status.types';
 import {
   PaymentFailureSimulator,
   type FailureSimulation,
 } from '../../application/ports/failure-simulator.port';
-import { Money } from '../../../../shared/domain/money';
+import { Money } from '../../../../shared/domain/value-object/money.vo';
 
 const PROBABILITY_SCALE = 1_000_000;
 
