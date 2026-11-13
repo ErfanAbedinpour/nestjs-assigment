@@ -2,6 +2,17 @@
 
 A NestJS service that keeps a per-user credit balance and processes payment requests asynchronously. PostgreSQL is the source of truth for balances, payment status, and the ledger. RabbitMQ only wakes the worker; a delivered message is never trusted to mean "process this exactly once."
 
+## Contents
+
+- [Architecture](#architecture)
+- [Payment lifecycle](#payment-lifecycle)
+- [HTTP API](#http-api)
+- [Run with Docker Compose](#run-with-docker-compose)
+- [Run the app on the host](#run-the-app-on-the-host)
+- [Testing](#testing)
+- [Configuration](#configuration)
+- [Troubleshooting](#troubleshooting)
+
 ## Technology stack
 
 - Node.js 24 LTS and TypeScript
@@ -35,6 +46,22 @@ src/
 
 `users` exposes account use cases. `payments` depends only on its own account ports; an adapter in the payments infrastructure calls those use cases. Both sides share one `UnitOfWork`, so a debit and the payment status commit in the same database transaction.
 
+```mermaid
+flowchart LR
+  Client --> API[HTTP API]
+  API --> DB[(PostgreSQL)]
+  API --> Cache[(Redis cache)]
+  API --> Broker[RabbitMQ]
+  Broker --> Worker[Payment worker]
+  Worker --> DB
+  Worker --> Broker
+```
+
+The API uses Nest CQRS commands and queries to dispatch requests to application
+handlers. The worker runs separately and uses the same domain and persistence
+layers. PostgreSQL stores payment state and the append-only ledger; Redis can be
+unavailable without becoming the authority for a financial operation.
+
 Amounts are integers of minor units. The domain calculates them with decimal.js and stores them as `BIGINT` in PostgreSQL. The API accepts and returns them as strings, never as JSON numbers.
 
 ## Payment lifecycle
@@ -46,6 +73,25 @@ Amounts are integers of minor units. The domain calculates them with decimal.js 
 - technical or simulated failure: `PENDING` again with `next_dispatch_at`, or `FAILED` when the attempt budget is exhausted
 
 The settlement writes the debit only when the row is still `PROCESSING` for the attempt that was claimed. A worker that lost its lease cannot debit. The reconciler returns expired `PROCESSING` rows and stale `QUEUED` rows to the dispatcher. Retries are recorded in `payment_events`.
+
+```mermaid
+stateDiagram-v2
+  [*] --> PENDING: Submit
+  PENDING --> QUEUED: Dispatch
+  QUEUED --> PROCESSING: Claim attempt
+  PROCESSING --> SUCCEEDED: Debit committed
+  PROCESSING --> FAILED: Business failure or retry limit
+  PROCESSING --> PENDING: Technical retry
+  QUEUED --> PENDING: Stale message recovered
+  FAILED --> PENDING: Eligible manual retry
+  PENDING --> CANCELLED: Cancel
+  QUEUED --> CANCELLED: Cancel
+```
+
+`attempts` counts processing claims, including the first attempt. The default
+`PAYMENT_MAX_ATTEMPTS=5` permits up to five total attempts for automatic technical
+retries. An insufficient balance is a business failure; it is not automatically
+retried. A manual retry is allowed once the account balance covers the amount.
 
 The simulator fails more often as the amount grows (`PAYMENT_FAILURE_PER_MINOR_UNIT`, capped by `PAYMENT_MAX_FAILURE_PROBABILITY`). A reference containing `FAIL` (or another token in `PAYMENT_FORCED_FAILURE_REFERENCES`) always fails technically, so the retry path can be observed. Set the probability to `0` and the pattern list to empty to disable simulation.
 
@@ -67,7 +113,22 @@ The simulator fails more often as the amount grows (`PAYMENT_FAILURE_PER_MINOR_U
 | `GET`  | `/admin/reports/transactions/summary` | Credits and debits by `daily`, `monthly`, or `yearly`.      |
 | `GET`  | `/admin/reports/balance-usage`        | Credits, debits, and balance per user.                      |
 
-`Idempotency-Key` is a UUID v4. Reusing it with the same body returns the original result. Reusing it with a different body returns `409`. Admin routes require `X-Admin-Api-Key`. Unknown failures return `500` with a request id and no stack trace; send `X-Request-Id` to supply one.
+`Idempotency-Key` is a UUID v4. Reusing it for the same request returns the original result. Payment replays compare the request fields; credit replays compare the amount. Reusing a key with conflicting details returns `409`. Admin routes require `X-Admin-Api-Key`. Unknown failures return `500` with a request id and no stack trace; send `X-Request-Id` to supply one.
+
+Use a new idempotency key for each new credit or payment. Reuse the original key
+only when retrying the same request. The Swagger example key is fixed, so replace
+it when making a different request.
+
+| HTTP status   | Meaning                                                                         |
+| ------------- | ------------------------------------------------------------------------------- |
+| `200` / `201` | Read or synchronous operation completed.                                        |
+| `202`         | Payment accepted for asynchronous processing; check its status later.           |
+| `400`         | Invalid input, identifier, or idempotency key.                                  |
+| `401`         | Missing or incorrect admin API key.                                             |
+| `404`         | User or payment was not found.                                                  |
+| `409`         | A conflicting idempotency key or an operation not allowed in the current state. |
+| `422`         | A business rule could not be satisfied.                                         |
+| `500`         | An unexpected server error; use the response request ID to find its log.        |
 
 Interactive documentation is served at [http://127.0.0.1:3000/docs](http://127.0.0.1:3000/docs). The raw document is at `/docs-json`.
 
@@ -81,6 +142,22 @@ curl -s -X POST http://127.0.0.1:3000/payments \
   -H 'idempotency-key: 7c9e6679-7425-40de-944b-e07fc1f90ae7' \
   -d '{"userId":"<id>","amount":"1200","reference":"INV-1001","description":"Invoice 1001"}'
 ```
+
+To add funds and inspect a payment, replace the placeholders and generate a new
+UUID v4 for the credit:
+
+```sh
+curl -s -X POST 'http://127.0.0.1:3000/users/<user-id>/credits' \
+  -H 'content-type: application/json' \
+  -H 'idempotency-key: <new-uuid-v4>' \
+  -d '{"amount":"500","reference":"top-up","description":"Account credit"}'
+
+curl -s 'http://127.0.0.1:3000/payments/<payment-id>'
+curl -s 'http://127.0.0.1:3000/payments/<payment-id>/events'
+```
+
+Replace the angle-bracket placeholders before running these commands. A payment's
+event history explains whether it was queued, processed, retried, or failed.
 
 `from` is inclusive and `to` is exclusive on the summary report:
 
@@ -206,4 +283,35 @@ Environment variables are validated at startup. `RABBITMQ_URL` and `REDIS_URL`, 
 
 Payment retries use exponential backoff with jitter (`PAYMENT_MAX_ATTEMPTS`, `PAYMENT_RETRY_BASE_DELAY_MS`, `PAYMENT_RETRY_MAX_DELAY_MS`, `PAYMENT_RETRY_JITTER_RATIO`). The schedule is stored on the payment row. `PAYMENT_PROCESSING_LEASE_MS` is how long a claimed attempt may run before the reconciler takes it back.
 
+| Setting                             | Default | Purpose                                                             |
+| ----------------------------------- | ------- | ------------------------------------------------------------------- |
+| `APP_PORT`                          | `3000`  | HTTP port inside the API process.                                   |
+| `PAYMENT_MAX_ATTEMPTS`              | `5`     | Total automatic processing attempts.                                |
+| `PAYMENT_RETRY_BASE_DELAY_MS`       | `1000`  | Initial retry delay in milliseconds.                                |
+| `PAYMENT_RETRY_MAX_DELAY_MS`        | `60000` | Maximum exponential delay before jitter.                            |
+| `PAYMENT_PROCESSING_LEASE_MS`       | `30000` | Time before a processing attempt can be recovered.                  |
+| `PAYMENT_QUEUED_STALE_MS`           | `30000` | Time before an unconsumed queued payment can be recovered.          |
+| `PAYMENT_FAILURE_PER_MINOR_UNIT`    | `0`     | Amount-based simulated failure rate; zero disables random failures. |
+| `PAYMENT_MAX_FAILURE_PROBABILITY`   | `0.8`   | Cap on the simulated failure probability.                           |
+| `PAYMENT_FORCED_FAILURE_REFERENCES` | `FAIL`  | Comma-separated reference tokens that force a simulated failure.    |
+
+See `.env.example` for connection settings and `.env.test.example` for E2E test
+settings. Configure the running API and worker themselves; changing a test runner's
+environment does not change an already-running service.
+
 Redis caches idempotency lookups and admin aggregates for a short TTL. A Redis outage is logged and ignored; PostgreSQL still decides.
+
+## Troubleshooting
+
+| Symptom                               | What to check                                                                                        |
+| ------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| Payment stays `PENDING`               | Check RabbitMQ connectivity and the worker dispatcher logs.                                          |
+| Payment stays `QUEUED`                | Check that the worker is running and consuming from the same broker as the API.                      |
+| E2E test reports `ENOTFOUND postgres` | Use the test database's host-reachable address in `.env.test`; `postgres` is a Compose network name. |
+| Admin request returns `401`           | Match `X-Admin-Api-Key` to the API's `ADMIN_API_KEY`.                                                |
+| E2E retry count differs from expected | Match `SYSTEM_TEST_MAX_ATTEMPTS` to the running worker's `PAYMENT_MAX_ATTEMPTS`.                     |
+| Credit or payment returns `409`       | Check whether the idempotency key was already used for a different request.                          |
+
+For Compose deployments, `docker compose ps` shows service status and
+`docker compose logs -f app worker` shows API and worker logs. A payment's event
+endpoint provides its recorded state transitions.
