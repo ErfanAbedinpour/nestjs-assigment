@@ -1,12 +1,12 @@
 import { Injectable } from '@nestjs/common';
-import { DomainError } from '../../../shared/domain/domain-error';
-import { Money } from '../../../shared/domain/money';
+import { DomainError } from '../../../shared/domain/error/domain.error';
+import { Money } from '../../../shared/domain/value-object/money.vo';
 import { Clock } from '../../../shared/application/ports/clock';
 import { IdGenerator } from '../../../shared/application/ports/id-generator';
 import { UnitOfWork } from '../../../shared/application/ports/unit-of-work';
-import { LedgerTransaction } from '../domain/ledger-transaction';
-import { LedgerRepository } from '../domain/ledger.repository';
-import { UserRepository } from '../domain/user.repository';
+import { LedgerTransaction } from '../domain/entity/ledger-transaction.entity';
+import { LedgerRepository } from '../domain/repository/ledger.repository';
+import { UserRepository } from '../domain/repository/user.repository';
 
 export type DebitUserCommand = {
   userId: string;
