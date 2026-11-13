@@ -1,3 +1,5 @@
+import { CqrsModule } from '@nestjs/cqrs';
+import { GetPaymentEventsHandler } from './application/handler/get-payment-events.handler';
 import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { RabbitMqModule } from '../../infrastructure/messaging/rabbitmq/rabbitmq.module';
@@ -5,17 +7,17 @@ import { RandomSource } from '../../shared/application/ports/random-source';
 import { SharedModule } from '../../shared/infrastructure/shared.module';
 import { UsersModule } from '../users/users.module';
 import { AccountDebitPort, AccountLookupPort } from './application/ports/account-ports';
-import { CancelPayment } from './application/cancel-payment';
-import { DispatchPendingPayments } from './application/dispatch-pending-payments';
+import { CancelPaymentHandler } from './application/handler/cancel-payment.handler';
+import { DispatchPendingPaymentsHandler } from './application/handler/dispatch-pending-payments.handler';
 import { PaymentFailureSimulator } from './application/ports/failure-simulator.port';
-import { GetPayment } from './application/get-payment';
+import { GetPaymentHandler } from './application/handler/get-payment.handler';
 import { PaymentQueuePort } from './application/ports/payment-queue.port';
-import { ProcessPayment } from './application/process-payment';
-import { RecoverStalledPayments } from './application/recover-stalled-payments';
-import { RetryPayment } from './application/retry-payment';
-import { SubmitPayment } from './application/submit-payment';
-import { PaymentRepository } from './domain/payment.repository';
-import { RetryPolicy } from './domain/retry-policy';
+import { ProcessPaymentHandler } from './application/handler/process-payment.handler';
+import { RecoverStalledPaymentsHandler } from './application/handler/recover-stalled-payments.handler';
+import { RetryPaymentHandler } from './application/handler/retry-payment.handler';
+import { SubmitPaymentHandler } from './application/handler/submit-payment.handler';
+import { PaymentRepository } from './domain/repository/payment.repository';
+import { RetryPolicy } from './domain/policy/retry.policy';
 import { AmountBasedFailureSimulator } from './infrastructure/adapters/amount-failure-simulator';
 import { UsersAccountAdapter } from './infrastructure/adapters/users-account.adapter';
 import { PaymentQueueTopology } from './infrastructure/messaging/payment-queue.topology';
@@ -24,7 +26,7 @@ import { PrismaPaymentRepository } from './infrastructure/persistence/prisma-pay
 import { PaymentsController } from './presentation/payments.controller';
 
 @Module({
-  imports: [SharedModule, UsersModule, RabbitMqModule],
+  imports: [SharedModule, UsersModule, RabbitMqModule, CqrsModule],
   controllers: [PaymentsController],
   providers: [
     PrismaPaymentRepository,
@@ -61,19 +63,15 @@ import { PaymentsController } from './presentation/payments.controller';
           random,
         ),
     },
-    SubmitPayment,
-    DispatchPendingPayments,
-    ProcessPayment,
-    RecoverStalledPayments,
-    RetryPayment,
-    CancelPayment,
-    GetPayment,
+    SubmitPaymentHandler,
+    DispatchPendingPaymentsHandler,
+    ProcessPaymentHandler,
+    RecoverStalledPaymentsHandler,
+    RetryPaymentHandler,
+    CancelPaymentHandler,
+    GetPaymentHandler,
+    GetPaymentEventsHandler,
   ],
-  exports: [
-    PaymentQueueTopology,
-    ProcessPayment,
-    DispatchPendingPayments,
-    RecoverStalledPayments,
-  ],
+  exports: [PaymentQueueTopology],
 })
 export class PaymentsModule {}
