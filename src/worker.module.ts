@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { CqrsModule } from '@nestjs/cqrs';
 import { ConfigModule } from './config/config.module';
 import { InfrastructureModule } from './infrastructure/infrastructure.module';
 import { PaymentConsumer } from './modules/payments/infrastructure/messaging/payment.consumer';
@@ -7,7 +8,7 @@ import { PaymentRecoveryPoller } from './modules/payments/infrastructure/polling
 import { PaymentsModule } from './modules/payments/payments.module';
 
 @Module({
-  imports: [ConfigModule, InfrastructureModule, PaymentsModule],
+  imports: [ConfigModule, InfrastructureModule, CqrsModule, PaymentsModule],
   providers: [PaymentConsumer, PaymentDispatchPoller, PaymentRecoveryPoller],
 })
 export class WorkerModule {}
