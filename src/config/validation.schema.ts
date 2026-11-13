@@ -58,7 +58,7 @@ export const validationSchema = Joi.object({
   PAYMENT_RECOVERY_INTERVAL_MS: Joi.number().integer().min(100).default(5000),
   PAYMENT_RECOVERY_BATCH_SIZE: Joi.number().integer().min(1).max(500).default(50),
   PAYMENT_QUEUED_STALE_MS: Joi.number().integer().min(1000).default(30_000),
-  PAYMENT_FAILURE_PER_MINOR_UNIT: decimalUnitInterval.default('0.00001'),
+  PAYMENT_FAILURE_PER_MINOR_UNIT: decimalUnitInterval.default('0'),
   PAYMENT_MAX_FAILURE_PROBABILITY: decimalUnitInterval.default('0.8'),
   PAYMENT_FORCED_FAILURE_REFERENCES: Joi.string().allow('').default('FAIL'),
   IDEMPOTENCY_CACHE_TTL_MS: Joi.number().integer().min(0).default(86_400_000),
