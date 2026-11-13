@@ -1,9 +1,10 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Post } from '@nestjs/common';
-import { Money } from '../../../shared/domain/money';
+import { Money } from '../../../shared/domain/value-object/money.vo';
 import { IdempotencyKey } from '../../../shared/presentation/idempotency-key.decorator';
-import { CreditUserAccount } from '../application/credit-user-account';
-import { GetUser } from '../application/get-user';
-import { RegisterUser } from '../application/register-user';
+import { CommandBus, QueryBus } from '@nestjs/cqrs';
+import { RegisterUserCommand } from '../application/command/register-user.command';
+import { CreditUserCommand } from '../application/command/credit-user.command';
+import { GetUserQuery } from '../application/query/get-user.query';
 import type { CreditView, UserView } from '../application/user.view';
 import {
   CreditUserBody,
@@ -22,9 +23,8 @@ import {
 @Controller('users')
 export class UsersController {
   constructor(
-    private readonly registerUser: RegisterUser,
-    private readonly getUser: GetUser,
-    private readonly creditUser: CreditUserAccount,
+    private readonly commandBus: CommandBus,
+    private readonly queryBus: QueryBus,
   ) {}
 
   @applyRegisterUser()
@@ -32,19 +32,21 @@ export class UsersController {
   register(
     @Body({ schema: registerUserSchema }) body: RegisterUserBody,
   ): Promise<UserView> {
-    return this.registerUser.execute({
-      email: body.email,
-      name: body.name,
-      ...(body.initialBalance !== undefined
-        ? { initialBalance: Money.positive(body.initialBalance) }
-        : {}),
-    });
+    return this.commandBus.execute(
+      new RegisterUserCommand({
+        email: body.email,
+        name: body.name,
+        ...(body.initialBalance !== undefined
+          ? { initialBalance: Money.positive(body.initialBalance) }
+          : {}),
+      }),
+    );
   }
 
   @applyGetUser()
   @Get(':id')
   get(@Param('id', new ParseUUIDPipe({ version: '4' })) id: string): Promise<UserView> {
-    return this.getUser.execute(id);
+    return this.queryBus.execute(new GetUserQuery(id));
   }
 
   @applyCreditUser()
@@ -54,12 +56,14 @@ export class UsersController {
     @IdempotencyKey() idempotencyKey: string,
     @Body({ schema: creditUserSchema }) body: CreditUserBody,
   ): Promise<CreditView> {
-    return this.creditUser.execute({
-      userId: id,
-      amount: Money.positive(body.amount),
-      idempotencyKey,
-      ...(body.reference !== undefined ? { reference: body.reference } : {}),
-      ...(body.description !== undefined ? { description: body.description } : {}),
-    });
+    return this.commandBus.execute(
+      new CreditUserCommand({
+        userId: id,
+        amount: Money.positive(body.amount),
+        idempotencyKey,
+        ...(body.reference !== undefined ? { reference: body.reference } : {}),
+        ...(body.description !== undefined ? { description: body.description } : {}),
+      }),
+    );
   }
 }
