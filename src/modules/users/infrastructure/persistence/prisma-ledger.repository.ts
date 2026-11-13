@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common';
-import { Money } from '../../../../shared/domain/money';
+import { Money } from '../../../../shared/domain/value-object/money.vo';
 import { UniqueConstraintError } from '../../../../shared/application/unique-constraint.error';
 import { isUniqueConstraintError } from '../../../../shared/infrastructure/persistence/prisma-errors';
 import { PrismaUnitOfWork } from '../../../../shared/infrastructure/persistence/prisma-unit-of-work';
-import { LedgerTransaction, type TransactionType } from '../../domain/ledger-transaction';
-import { LedgerRepository } from '../../domain/ledger.repository';
+import { LedgerTransaction, type TransactionType } from '../../domain/entity/ledger-transaction.entity';
+import { LedgerRepository } from '../../domain/repository/ledger.repository';
 
 type LedgerRow = {
   id: string;
