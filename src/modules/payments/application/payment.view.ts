@@ -1,5 +1,5 @@
-import type { Payment } from '../domain/payment';
-import type { StoredPaymentEvent } from '../domain/payment-status';
+import type { Payment } from '../domain/aggregation/payment.aggregate';
+import type { StoredPaymentEvent } from '../domain/types/payment-status.types';
 
 export type PaymentView = {
   id: string;
