@@ -130,7 +130,8 @@ npm run start:dev
 npm run start:worker:dev
 ```
 
-The API can accept payments without the worker. They stay `PENDING` until a worker is publishing and consuming.
+The API can accept payments without the worker. Depending on broker availability,
+they remain `PENDING` or `QUEUED` until the worker processes them.
 
 ## Prisma
 
@@ -149,28 +150,55 @@ Migrations are not applied on application startup. Compose runs `prisma migrate 
 
 ## Available npm scripts
 
-| Script                                     | Purpose                            |
-| ------------------------------------------ | ---------------------------------- |
-| `npm run start:dev`                        | API with watch mode                |
-| `npm run start:worker:dev`                 | Worker with watch mode             |
-| `npm run build`                            | Generate Prisma Client and compile |
-| `npm run start:prod` / `start:worker:prod` | Run the compiled API or worker     |
-| `npm run typecheck`                        | Type-check without emitting        |
-| `npm run lint`                             | ESLint                             |
-| `npm run format` / `format:check`          | Prettier                           |
-| `npm test` / `test:watch` / `test:cov`     | Vitest                             |
-| `npm run test:e2e`                         | End-to-end Vitest configuration    |
+| Script                                     | Purpose                                     |
+| ------------------------------------------ | ------------------------------------------- |
+| `npm run start:dev`                        | API with watch mode                         |
+| `npm run start:worker:dev`                 | Worker with watch mode                      |
+| `npm run build`                            | Generate Prisma Client and compile          |
+| `npm run start:prod` / `start:worker:prod` | Run the compiled API or worker              |
+| `npm run typecheck`                        | Type-check without emitting                 |
+| `npm run lint`                             | ESLint                                      |
+| `npm run format` / `format:check`          | Prettier                                    |
+| `npm test` / `test:watch` / `test:cov`     | Vitest                                      |
+| `npm run test:e2e`                         | End-to-end Vitest configuration             |
+| `npm run prisma:*`                         | Generate, validate, migrate, or open Studio |
 
-Run `npm run test:cov` for unit test coverage. The terminal report lists uncovered
-lines by file; `coverage/index.html` provides an interactive file and branch view,
-`coverage/lcov.info` is suitable for CI, and `coverage/coverage-summary.json`
-contains machine-readable totals. Coverage includes source files whose names match a
-unit test in the same area: for example, `payment.spec.ts` matches `payment.ts` or
-`payment.handler.ts`. Grouped tests with different names do not select files for coverage;
-use matching test names to include those files. Generated Prisma code and test files are
-excluded. The unit and HTTP suites run separately, so the unit coverage report does not
-include HTTP test execution.
-| `npm run prisma:*` | Generate, validate, migrate, or open Studio |
+## Testing
+
+### Unit tests and coverage
+
+Run `npm test` for the unit suite or `npm run test:cov` for coverage. The terminal
+report lists uncovered lines by file. Open `coverage/index.html` for a detailed
+report; `coverage/lcov.info` and `coverage/coverage-summary.json` are available for
+CI and other tools.
+
+Coverage includes source files whose names match a unit test in the same area. For
+example, `payment.spec.ts` matches `payment.ts` or `payment.handler.ts`. A grouped
+test with a different name does not select a source file for the report. The reported
+percentage therefore describes the selected files, **not the whole project**. Test
+files, generated Prisma code, and E2E execution are excluded.
+
+### End-to-end tests
+
+The E2E suite sends real HTTP requests and checks PostgreSQL. It creates users,
+credits, and payments; use a **disposable test stack** with a running API, worker,
+PostgreSQL, RabbitMQ, and Redis. The API and worker must point to the same test
+database and broker.
+
+1. Copy `.env.test.example` to `.env.test` and fill in the test-only values.
+2. Set `DATABASE_URL` to the disposable database as seen by the test process. Use
+   `localhost` and the published port when running tests on the host.
+3. Set `SYSTEM_TEST_ADMIN_KEY` to the key configured on the test API and
+   `SYSTEM_TEST_MAX_ATTEMPTS` to the worker's `PAYMENT_MAX_ATTEMPTS`.
+4. Configure the test worker with `PAYMENT_MAX_ATTEMPTS=5`, short retry delays,
+   `PAYMENT_FAILURE_PER_MINOR_UNIT=0`, and `PAYMENT_FORCED_FAILURE_REFERENCES=FAIL`.
+5. Start the test API and worker, then run `npm run test:e2e`.
+
+The configuration loads `.env.test` first and then fills missing values from `.env`;
+variables already set in the shell take precedence. Settings in `.env.test` are read
+by the tests and do not change the environment of an already-running worker. If a
+payment stays `QUEUED`, check that the worker is running and connected to the same
+database and RabbitMQ as the API.
 
 ## Configuration
 
