@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
-import { Money } from '../../../../shared/domain/money';
+import { Money } from '../../../../shared/domain/value-object/money.vo';
 import { DebitUserBalance } from '../../../users/application/debit-user-balance';
-import { GetUser } from '../../../users/application/get-user';
+import { QueryBus } from '@nestjs/cqrs';
+import { GetUserBalanceQuery } from '../../../users/application/query/get-user-balance.query';
 import {
   AccountDebitPort,
   AccountLookupPort,
@@ -13,7 +14,7 @@ import {
 export class UsersAccountAdapter implements AccountDebitPort, AccountLookupPort {
   constructor(
     private readonly debitUserBalance: DebitUserBalance,
-    private readonly getUser: GetUser,
+    private readonly queries: QueryBus,
   ) {}
 
   async debit(command: AccountDebitCommand): Promise<void> {
@@ -21,11 +22,11 @@ export class UsersAccountAdapter implements AccountDebitPort, AccountLookupPort 
   }
 
   async exists(userId: string): Promise<boolean> {
-    return (await this.getUser.balanceOf(userId)) !== undefined;
+    return (await this.queries.execute(new GetUserBalanceQuery(userId))) !== undefined;
   }
 
   async balanceCovers(userId: string, amount: Money): Promise<boolean> {
-    const balance = await this.getUser.balanceOf(userId);
+    const balance = await this.queries.execute(new GetUserBalanceQuery(userId));
     return balance !== undefined && balance >= amount.toMinorUnits();
   }
 }
