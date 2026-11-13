@@ -67,7 +67,7 @@ export const configuration = () => ({
     recoveryIntervalMs: Number(process.env['PAYMENT_RECOVERY_INTERVAL_MS'] ?? 5000),
     recoveryBatchSize: Number(process.env['PAYMENT_RECOVERY_BATCH_SIZE'] ?? 50),
     queuedStaleMs: Number(process.env['PAYMENT_QUEUED_STALE_MS'] ?? 30000),
-    failurePerMinorUnit: process.env['PAYMENT_FAILURE_PER_MINOR_UNIT'] ?? '0.00001',
+    failurePerMinorUnit: process.env['PAYMENT_FAILURE_PER_MINOR_UNIT'] ?? '0',
     maxFailureProbability: process.env['PAYMENT_MAX_FAILURE_PROBABILITY'] ?? '0.8',
     forcedReferencePatterns: forcedFailurePatterns(),
     idempotencyCacheTtlMs: Number(process.env['IDEMPOTENCY_CACHE_TTL_MS'] ?? 86400000),
