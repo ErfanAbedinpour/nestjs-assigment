@@ -149,18 +149,28 @@ Migrations are not applied on application startup. Compose runs `prisma migrate 
 
 ## Available npm scripts
 
-| Script                                     | Purpose                                     |
-| ------------------------------------------ | ------------------------------------------- |
-| `npm run start:dev`                        | API with watch mode                         |
-| `npm run start:worker:dev`                 | Worker with watch mode                      |
-| `npm run build`                            | Generate Prisma Client and compile          |
-| `npm run start:prod` / `start:worker:prod` | Run the compiled API or worker              |
-| `npm run typecheck`                        | Type-check without emitting                 |
-| `npm run lint`                             | ESLint                                      |
-| `npm run format` / `format:check`          | Prettier                                    |
-| `npm test` / `test:watch` / `test:cov`     | Vitest                                      |
-| `npm run test:e2e`                         | End-to-end Vitest configuration             |
-| `npm run prisma:*`                         | Generate, validate, migrate, or open Studio |
+| Script                                     | Purpose                            |
+| ------------------------------------------ | ---------------------------------- |
+| `npm run start:dev`                        | API with watch mode                |
+| `npm run start:worker:dev`                 | Worker with watch mode             |
+| `npm run build`                            | Generate Prisma Client and compile |
+| `npm run start:prod` / `start:worker:prod` | Run the compiled API or worker     |
+| `npm run typecheck`                        | Type-check without emitting        |
+| `npm run lint`                             | ESLint                             |
+| `npm run format` / `format:check`          | Prettier                           |
+| `npm test` / `test:watch` / `test:cov`     | Vitest                             |
+| `npm run test:e2e`                         | End-to-end Vitest configuration    |
+
+Run `npm run test:cov` for unit test coverage. The terminal report lists uncovered
+lines by file; `coverage/index.html` provides an interactive file and branch view,
+`coverage/lcov.info` is suitable for CI, and `coverage/coverage-summary.json`
+contains machine-readable totals. Coverage includes source files whose names match a
+unit test in the same area: for example, `payment.spec.ts` matches `payment.ts` or
+`payment.handler.ts`. Grouped tests with different names do not select files for coverage;
+use matching test names to include those files. Generated Prisma code and test files are
+excluded. The unit and HTTP suites run separately, so the unit coverage report does not
+include HTTP test execution.
+| `npm run prisma:*` | Generate, validate, migrate, or open Studio |
 
 ## Configuration
 
