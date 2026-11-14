@@ -53,6 +53,7 @@ export const configuration = () => ({
     port: Number(process.env['REDIS_PORT'] ?? 6379),
     password: process.env['REDIS_PASSWORD'] ?? '',
     database: Number(process.env['REDIS_DB'] ?? 0),
+    connectionTimeoutMs: Number(process.env['REDIS_CONNECTION_TIMEOUT_MS'] ?? 1000),
   },
   payments: {
     retry: {
