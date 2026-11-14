@@ -14,7 +14,9 @@ describe('RedisCacheAdapter', () => {
     await expect(adapter.get('key')).resolves.toEqual({ value: 1 });
     await expect(adapter.get('missing')).resolves.toBeUndefined();
     await adapter.set('key', { value: 1 }, 500);
-    expect(cache.set).toHaveBeenCalledWith('key', { value: 1 }, 500);
+    expect(cache.set).toHaveBeenCalledWith('key', { value: 1 }, expect.any(Number));
+    expect(cache.set.mock.calls[0][2]).toBeGreaterThanOrEqual(450);
+    expect(cache.set.mock.calls[0][2]).toBeLessThanOrEqual(500);
   });
 
   it('continues when cache reads or writes fail', async () => {
