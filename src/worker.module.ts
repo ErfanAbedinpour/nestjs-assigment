@@ -9,6 +9,7 @@ import { PaymentsModule } from './modules/payments/payments.module';
 
 @Module({
   imports: [ConfigModule, InfrastructureModule, CqrsModule, PaymentsModule],
-  providers: [PaymentConsumer, PaymentDispatchPoller, PaymentRecoveryPoller],
+  controllers: [PaymentConsumer],
+  providers: [PaymentDispatchPoller, PaymentRecoveryPoller],
 })
 export class WorkerModule {}
