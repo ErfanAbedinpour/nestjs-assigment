@@ -1,6 +1,13 @@
-import { Injectable } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  type OnModuleInit,
+  type OnModuleDestroy,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import type { Channel } from 'amqp-connection-manager';
+import type { Channel, ChannelWrapper } from 'amqp-connection-manager';
+
+import { RabbitMqService } from '../../../../infrastructure/messaging/rabbitmq/rabbitmq.service';
 
 export type PaymentQueueNames = {
   exchange: string;
@@ -13,8 +20,27 @@ export type PaymentQueueNames = {
 };
 
 @Injectable()
-export class PaymentQueueTopology {
-  constructor(private readonly config: ConfigService) {}
+export class PaymentQueueTopology implements OnModuleInit, OnModuleDestroy {
+  private channel: ChannelWrapper | undefined;
+  constructor(
+    private readonly config: ConfigService,
+    private readonly rabbit: RabbitMqService,
+  ) {}
+
+  async onModuleInit(): Promise<void> {
+    this.channel = this.rabbit.getConnection().createChannel({
+      name: 'payment-topology',
+      setup: (channel: Channel) => this.assert(channel),
+    });
+    this.channel.on('error', (error: unknown) =>
+      new Logger(PaymentQueueTopology.name).error(error),
+    );
+    await this.channel.waitForConnect();
+  }
+
+  async onModuleDestroy(): Promise<void> {
+    await this.channel?.close();
+  }
 
   names(): PaymentQueueNames {
     return {
