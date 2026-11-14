@@ -12,7 +12,18 @@ const logger = new Logger('RedisModule');
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (config: ConfigService) => {
-        const redisStore = createKeyv(config.getOrThrow<string>('redis.url'));
+        const redisStore = createKeyv(
+          {
+            url: config.getOrThrow<string>('redis.url'),
+            disableOfflineQueue: true,
+            socket: {
+              reconnectStrategy: (attempts: number) =>
+                Math.min(100 * 2 ** Math.min(attempts, 5), 3000) +
+                Math.floor(Math.random() * 100),
+            },
+          },
+          { connectionTimeout: config.getOrThrow<number>('redis.connectionTimeoutMs') },
+        );
         redisStore.on('error', (error: unknown) => {
           logger.error(
             'Redis store error',
