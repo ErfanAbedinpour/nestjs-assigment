@@ -281,6 +281,13 @@ database and RabbitMQ as the API.
 
 Environment variables are validated at startup. `RABBITMQ_URL` and `REDIS_URL`, when non-empty, override the component settings. `ADMIN_API_KEY` defaults to `change_me` for local development and must be replaced before the API is exposed.
 
+Redis is an optional cache, not the source of truth for payment decisions. Set
+`REDIS_CONNECTION_TIMEOUT_MS` to bound the connection handshake (default 1000 ms).
+The Redis client disables its offline command queue and reconnects with backoff.
+Cache TTLs include up to 10% downward jitter, and concurrent report cache misses
+are coalesced within each process. Report values can remain stale for their TTL;
+coalescing does not coordinate between replicas.
+
 Payment retries use exponential backoff with jitter (`PAYMENT_MAX_ATTEMPTS`, `PAYMENT_RETRY_BASE_DELAY_MS`, `PAYMENT_RETRY_MAX_DELAY_MS`, `PAYMENT_RETRY_JITTER_RATIO`). The schedule is stored on the payment row. `PAYMENT_PROCESSING_LEASE_MS` is how long a claimed attempt may run before the reconciler takes it back.
 
 | Setting                             | Default | Purpose                                                             |
