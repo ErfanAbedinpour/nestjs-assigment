@@ -43,6 +43,7 @@ export const validationSchema = Joi.object({
   REDIS_HOST_PORT: Joi.number().port().default(6379),
   REDIS_PASSWORD: Joi.string().allow('').default(''),
   REDIS_DB: Joi.number().integer().min(0).default(0),
+  REDIS_CONNECTION_TIMEOUT_MS: Joi.number().integer().min(100).default(1000),
   REDIS_URL: Joi.string()
     .uri({ scheme: ['redis', 'rediss'] })
     .allow('')
