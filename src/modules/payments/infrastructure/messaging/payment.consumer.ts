@@ -21,6 +21,7 @@ import { PaymentQueueTopology } from './payment-queue.topology';
 export class PaymentConsumer implements OnApplicationBootstrap, OnModuleDestroy {
   private readonly logger = new Logger(PaymentConsumer.name);
   private channel: ChannelWrapper | undefined;
+  private readonly inFlight = new Set<Promise<void>>();
 
   constructor(
     private readonly rabbit: RabbitMqService,
@@ -48,7 +49,18 @@ export class PaymentConsumer implements OnApplicationBootstrap, OnModuleDestroy 
     await channel.consume(
       names.queue,
       (message) => {
-        void this.onMessage(channel, message);
+        const work = this.onMessage(channel, message);
+        this.inFlight.add(work);
+        void work.then(
+          () => this.inFlight.delete(work),
+          (error: unknown) => {
+            this.inFlight.delete(work);
+            this.logger.error(
+              'Payment delivery failed',
+              error instanceof Error ? error.stack : undefined,
+            );
+          },
+        );
       },
       { noAck: false, prefetch: names.prefetch },
     );
@@ -56,6 +68,7 @@ export class PaymentConsumer implements OnApplicationBootstrap, OnModuleDestroy 
 
   async onModuleDestroy(): Promise<void> {
     await this.channel?.cancelAll();
+    await Promise.allSettled([...this.inFlight]);
     await this.channel?.close();
     this.channel = undefined;
   }
