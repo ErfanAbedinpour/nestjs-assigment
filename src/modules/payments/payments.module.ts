@@ -1,5 +1,10 @@
 import { CqrsModule } from '@nestjs/cqrs';
 import { GetPaymentEventsHandler } from './application/handler/get-payment-events.handler';
+import { ClientProxyFactory } from '@nestjs/microservices';
+import {
+  PAYMENT_RMQ_CLIENT,
+  paymentRmqOptions,
+} from './infrastructure/messaging/payment-rmq.options';
 import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { RabbitMqModule } from '../../infrastructure/messaging/rabbitmq/rabbitmq.module';
@@ -35,6 +40,12 @@ import { PaymentsController } from './presentation/payments.controller';
     { provide: AccountDebitPort, useExisting: UsersAccountAdapter },
     { provide: AccountLookupPort, useExisting: UsersAccountAdapter },
     PaymentQueueTopology,
+    {
+      provide: PAYMENT_RMQ_CLIENT,
+      inject: [ConfigService, PaymentQueueTopology],
+      useFactory: (config: ConfigService, topology: PaymentQueueTopology) =>
+        ClientProxyFactory.create(paymentRmqOptions(config, topology)),
+    },
     RabbitPaymentQueue,
     { provide: PaymentQueuePort, useExisting: RabbitPaymentQueue },
     {
