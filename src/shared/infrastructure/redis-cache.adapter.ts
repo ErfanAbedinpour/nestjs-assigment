@@ -22,7 +22,10 @@ export class RedisCacheAdapter extends CachePort {
 
   override async set<T>(key: string, value: T, ttlMs: number): Promise<void> {
     try {
-      await this.redis.getCacheManager().set(key, value, ttlMs);
+      // Shorten, never extend, the caller's maximum staleness window.
+      const jitteredTtl =
+        ttlMs > 0 ? Math.max(1, Math.floor(ttlMs * (0.9 + Math.random() * 0.1))) : ttlMs;
+      await this.redis.getCacheManager().set(key, value, jitteredTtl);
     } catch (error) {
       this.logger.warn(`Cache write failed for ${key}: ${errorMessage(error)}`);
     }
