@@ -4,10 +4,12 @@ import { CachePort } from '../../../../shared/application/ports/cache-port';
 import { ConfigService } from '@nestjs/config';
 import { DomainError } from '../../../../shared/domain/error/domain.error';
 import type { TransactionSummary } from '../admin-read-models';
+import { CoalesceRequests } from '../../../../shared/application/coalesce-requests';
 import { GetTransactionSummaryQuery } from '../query/get-transaction-summary.query';
 const MAX_RANGE_MS = 10 * 366 * 24 * 60 * 60 * 1000;
 @QueryHandler(GetTransactionSummaryQuery)
 export class GetTransactionSummaryHandler {
+  private readonly coalescer = new CoalesceRequests();
   constructor(
     private readonly queries: AdminQueryPort,
     private readonly cache: CachePort,
@@ -27,12 +29,14 @@ export class GetTransactionSummaryHandler {
     const key = `admin:tx-summary:${period}:${from.toISOString()}:${to.toISOString()}`;
     const cached = await this.cache.get<TransactionSummary>(key);
     if (cached) return cached;
-    const summary = await this.queries.transactionSummary(period, from, to);
-    await this.cache.set(
-      key,
-      summary,
-      this.config.getOrThrow<number>('admin.reportCacheTtlMs'),
-    );
-    return summary;
+    return this.coalescer.run(key, async () => {
+      const summary = await this.queries.transactionSummary(period, from, to);
+      await this.cache.set(
+        key,
+        summary,
+        this.config.getOrThrow<number>('admin.reportCacheTtlMs'),
+      );
+      return summary;
+    });
   }
 }
