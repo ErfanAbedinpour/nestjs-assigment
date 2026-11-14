@@ -9,6 +9,7 @@ async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule, {
     logger: new ConsoleLogger({ json: true, colors: false }),
   });
+  app.enableShutdownHooks();
   configureHttpApp(app);
   setupOpenApi(app);
 
